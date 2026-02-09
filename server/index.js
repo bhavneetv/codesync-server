@@ -10,6 +10,12 @@ const PORT = process.env.PORT || process.env.CODE_SYNC_RUNTIME_PORT || 3001;
 
 const previews = new Map();
 
+const baseHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
 const rewriteRootUrls = (content, basePrefix) => {
   if (!content) return content;
   const safeBase = basePrefix.endsWith('/') ? basePrefix.slice(0, -1) : basePrefix;
@@ -72,9 +78,15 @@ const cleanupPreview = (previewId) => {
   previews.delete(previewId);
 };
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || '/', `http://${req.headers.host}`);
   const segments = url.pathname.split('/').filter(Boolean);
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, baseHeaders);
+    res.end();
+    return;
+  }
 
   if (segments[0] === 'preview') {
     const previewId = segments[1];
@@ -460,3 +472,4 @@ wss.on('connection', (ws) => {
 server.listen(PORT, () => {
   console.log(`Code Sync runtime server listening on ${PORT}`);
 });
+
