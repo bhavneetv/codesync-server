@@ -52,9 +52,7 @@ const runCommand = (cmd, args, options) =>
     child.on('close', code => resolve({ code, stdout, stderr }));
   });
 
-/*
-Detect the Java class that defines a runnable main method.
-*/
+
 const parseJavaClassInfo = (workdir, fileName) => {
   try {
     const content = fs.readFileSync(path.join(workdir, fileName), 'utf8');
@@ -126,17 +124,17 @@ wss.on('connection', (ws) => {
 
         const language = msg.language;
 
-        // 🐍 PYTHON
+        
         if (language === 'python') {
           proc = spawn(resolvePythonCommand(), ['-u', entryFile], { cwd: workdir });
         }
 
-        // 🟢 NODE
+        
         else if (language === 'node') {
           proc = spawn('node', [entryFile], { cwd: workdir });
         }
 
-        // ☕ JAVA — FIXED
+        
         else if (language === 'java') {
           const javaFiles = files.map(f => f.name).filter(n => n.endsWith('.java'));
           if (!javaFiles.length) {
@@ -175,7 +173,7 @@ wss.on('connection', (ws) => {
           });
         }
 
-        // 🧠 C
+        
         else if (language === 'c') {
           const cFiles = files.map(f => f.name).filter(n => n.endsWith('.c'));
           const out = 'app.out';
@@ -191,7 +189,7 @@ wss.on('connection', (ws) => {
           proc = spawn(path.join(workdir, out), [], { cwd: workdir });
         }
 
-        // 🧠 CPP
+        
         else if (language === 'cpp') {
           const cppFiles = files.map(f => f.name).filter(n =>
             n.endsWith('.cpp') || n.endsWith('.cc') || n.endsWith('.cxx')
