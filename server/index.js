@@ -53,25 +53,35 @@ const runCommand = (cmd, args, options) =>
   });
 
 /*
-⭐ NEW — ENTRY FILE BASED JAVA MAIN DETECTION
-Works perfectly for main.java
+Detect the Java class that defines a runnable main method.
 */
-const findJavaMainClass = (workdir, entryFile) => {
+const parseJavaClassInfo = (workdir, fileName) => {
   try {
-    const content = fs.readFileSync(path.join(workdir, entryFile), 'utf8');
-
+    const content = fs.readFileSync(path.join(workdir, fileName), 'utf8');
     const pkgMatch = content.match(/^\s*package\s+([\w.]+)\s*;/m);
+    const classMatch = content.match(/\b(class|record|enum)\s+([A-Za-z_]\w*)/);
+    const hasMain = /\b(public\s+static|static\s+public)\s+void\s+main\s*\(\s*(?:String\s*(?:\[\s*\]|\.\.\.)\s+[A-Za-z_]\w*|String\s+[A-Za-z_]\w*\s*\[\s*\])\s*\)/m.test(content);
+
     const pkg = pkgMatch ? pkgMatch[1] : '';
+    const className = classMatch ? classMatch[2] : path.basename(fileName, '.java');
+    const fqcn = pkg ? `${pkg}.${className}` : className;
 
-    const classMatch = content.match(/class\s+(\w+)/);
-    const className = classMatch
-      ? classMatch[1]
-      : path.basename(entryFile, '.java');
-
-    return pkg ? `${pkg}.${className}` : className;
+    return { hasMain, fqcn };
   } catch {
-    return path.basename(entryFile, '.java');
+    return { hasMain: false, fqcn: path.basename(fileName, '.java') };
   }
+};
+
+const findJavaMainClass = (workdir, entryFile, javaFiles) => {
+  const candidates = Array.from(new Set([entryFile, ...javaFiles]))
+    .filter(name => name && name.endsWith('.java'));
+
+  for (const fileName of candidates) {
+    const info = parseJavaClassInfo(workdir, fileName);
+    if (info.hasMain) return info.fqcn;
+  }
+
+  return null;
 };
 
 wss.on('connection', (ws) => {
@@ -129,6 +139,14 @@ wss.on('connection', (ws) => {
         // ☕ JAVA — FIXED
         else if (language === 'java') {
           const javaFiles = files.map(f => f.name).filter(n => n.endsWith('.java'));
+          if (!javaFiles.length) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'No Java source files found. Add at least one .java file.'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
 
           const compile = await runCommand('javac', javaFiles, { cwd: workdir });
 
@@ -141,7 +159,15 @@ wss.on('connection', (ws) => {
             return;
           }
 
-          const mainClass = findJavaMainClass(workdir, entryFile);
+          const mainClass = findJavaMainClass(workdir, entryFile, javaFiles);
+          if (!mainClass) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'Main method not found in submitted Java files. Define: public static void main(String[] args)'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
 
           proc = spawn('java', ['-cp', workdir, mainClass], {
             cwd: workdir,
@@ -226,3 +252,4 @@ wss.on('connection', (ws) => {
 server.listen(PORT, () => {
   console.log(`Runtime server running on ${PORT}`);
 });
+
