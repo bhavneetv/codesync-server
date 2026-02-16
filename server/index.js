@@ -7,6 +7,8 @@ import path from 'path';
 import crypto from 'crypto';
 
 const PORT = process.env.PORT || process.env.CODE_SYNC_RUNTIME_PORT || 3001;
+const RUNTIME_PUBLIC_HTTP_URL = 'https://codesync-server-pf6m.onrender.com';
+const RUNTIME_PUBLIC_WS_URL = RUNTIME_PUBLIC_HTTP_URL.replace(/^http/i, 'ws');
 
 const previews = new Map();
 
@@ -337,6 +339,6 @@ wss.on('connection', (ws) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Runtime server running on ${PORT}`);
+  console.log(`Runtime server running on ${PORT} (${RUNTIME_PUBLIC_WS_URL})`);
 });
 
