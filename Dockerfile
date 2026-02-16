@@ -4,6 +4,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 python3-pip \
     default-jre default-jdk \
     build-essential \
+    golang-go \
+    php-cli \
+    rustc cargo \
+    mono-mcs mono-runtime \
+    kotlin \
+    lua5.4 \
+    perl \
     ruby-full \
     swi-prolog \
     && rm -rf /var/lib/apt/lists/*

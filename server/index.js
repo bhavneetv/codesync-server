@@ -40,6 +40,8 @@ const cleanupProcess = (proc, workdir) => {
 
 const resolvePythonCommand = () =>
   process.platform === 'win32' ? 'python' : 'python3';
+const resolveLuaCommand = () =>
+  process.platform === 'win32' ? 'lua' : 'lua5.4';
 
 const runCommand = (cmd, args, options) =>
   new Promise((resolve) => {
@@ -223,6 +225,151 @@ wss.on('connection', (ws) => {
         
         else if (language === 'node') {
           proc = spawn('node', [entryFile], { cwd: workdir });
+        }
+
+        else if (language === 'ruby') {
+          proc = spawn('ruby', [entryFile], { cwd: workdir });
+        }
+
+        else if (language === 'prolog') {
+          proc = spawn('swipl', ['-q', '-f', entryFile, '-t', 'halt'], { cwd: workdir });
+        }
+
+        else if (language === 'bash') {
+          proc = spawn('bash', [entryFile], { cwd: workdir });
+        }
+
+        else if (language === 'php') {
+          proc = spawn('php', [entryFile], { cwd: workdir });
+        }
+
+        else if (language === 'go') {
+          const goFiles = files.map(f => f.name).filter(n => n.endsWith('.go'));
+          if (!goFiles.length) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'No Go source files found. Add at least one .go file.'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          const out = 'app.out';
+          const compile = await runCommand('go', ['build', '-o', out, ...goFiles], { cwd: workdir });
+
+          if (compile.code !== 0) {
+            ws.send(JSON.stringify({ type: 'error', data: compile.stderr || 'Go compilation failed' }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          proc = spawn(path.join(workdir, out), [], { cwd: workdir });
+        }
+
+        else if (language === 'rust') {
+          const rustEntry = files.find(f => f.name === entryFile && f.name.endsWith('.rs'))
+            ? entryFile
+            : (files.find(f => f.name.endsWith('.rs'))?.name || entryFile);
+
+          if (!rustEntry || !rustEntry.endsWith('.rs')) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'No Rust source files found. Add at least one .rs file.'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          const out = 'app.out';
+          const compile = await runCommand('rustc', [rustEntry, '-O', '-o', out], { cwd: workdir });
+
+          if (compile.code !== 0) {
+            ws.send(JSON.stringify({ type: 'error', data: compile.stderr || 'Rust compilation failed' }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          proc = spawn(path.join(workdir, out), [], { cwd: workdir });
+        }
+
+        else if (language === 'csharp') {
+          const csFiles = files.map(f => f.name).filter(n => n.endsWith('.cs'));
+          if (!csFiles.length) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'No C# source files found. Add at least one .cs file.'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          const out = 'app.exe';
+          const compile = await runCommand('mcs', ['-out:' + out, ...csFiles], { cwd: workdir });
+
+          if (compile.code !== 0) {
+            ws.send(JSON.stringify({ type: 'error', data: compile.stderr || 'C# compilation failed' }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          proc = spawn('mono', [out], { cwd: workdir });
+        }
+
+        else if (language === 'kotlin') {
+          const ktFiles = files.map(f => f.name).filter(n => n.endsWith('.kt'));
+          if (!ktFiles.length) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'No Kotlin source files found. Add at least one .kt file.'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          const outJar = 'app.jar';
+          const compile = await runCommand('kotlinc', [...ktFiles, '-include-runtime', '-d', outJar], { cwd: workdir });
+
+          if (compile.code !== 0) {
+            ws.send(JSON.stringify({ type: 'error', data: compile.stderr || 'Kotlin compilation failed' }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          proc = spawn('java', ['-jar', outJar], { cwd: workdir });
+        }
+
+        else if (language === 'lua') {
+          const luaEntry = files.find(f => f.name === entryFile && f.name.endsWith('.lua'))
+            ? entryFile
+            : (files.find(f => f.name.endsWith('.lua'))?.name || entryFile);
+
+          if (!luaEntry || !luaEntry.endsWith('.lua')) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'No Lua source files found. Add at least one .lua file.'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          proc = spawn(resolveLuaCommand(), [luaEntry], { cwd: workdir });
+        }
+
+        else if (language === 'perl') {
+          const perlEntry = files.find(f => f.name === entryFile && (f.name.endsWith('.pl') || f.name.endsWith('.pm')))
+            ? entryFile
+            : (files.find(f => f.name.endsWith('.pl') || f.name.endsWith('.pm'))?.name || entryFile);
+
+          if (!perlEntry || (!perlEntry.endsWith('.pl') && !perlEntry.endsWith('.pm'))) {
+            ws.send(JSON.stringify({
+              type: 'error',
+              data: 'No Perl source files found. Add at least one .pl/.pm file.'
+            }));
+            cleanupProcess(proc, workdir);
+            return;
+          }
+
+          proc = spawn('perl', [perlEntry], { cwd: workdir });
         }
 
         
